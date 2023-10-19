@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+helper ()
+{
+  if [ $# -gt 0 ] && [ $1 != "-" ]; then
+    echo $0: illegal option -- $@
+  fi
+
+  echo "usage: $0 commands"
+  echo
+  echo "Commands:"
+  echo "    help           shows this helper text"
+  echo "    ssh-redis      connects to redis container via SSH"
+  echo "    flush-cache    flushes all data from redis container"
+  echo "    status         outputs status of redis container"
+  echo "    build          builds the redis container"
+  echo "    down           stops & removes the Docker containers and associated network"
+  echo "    up             starts the redis container and associated network"
+  echo "    restart        restarts the redis container"
+  echo
+
+  exit 1
+}
+
+setup ()
+{
+  mkdir -p .docker/redis/data
+
+  ERROR_LOG_DIR="logs"
+  mkdir -p logs/
+  ERROR_LOG_FILE="$EROR_LOG_DIR/redis.log"
+  if [ -z "$ERROR_LOG_FILE" ]; then
+      touch $ERROR_LOG_FILE
+  fi
+}
+
+#change directory to the project root
+cd $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/..
+
+#parse the arguments sent to the script without any flags
+if [ $# -eq 0 ]; then
+  helper
+else
+  case $1 in
+    help|'/?'|'-h'|'/h'|'--help'|'/help')
+      helper
+      ;;
+
+    ssh-redis)
+      docker exec -it mobile-rma-bff-redis /bin/bash
+      ;;
+
+    flush-cache)
+      docker exec -it mobile-rma-bff-redis redis-cli FLUSHALL
+      ;;
+
+    status)
+      docker ps -a
+      ;;
+
+    build)
+      docker compose down
+
+      setup
+
+      docker compose up --build -d
+
+      if [[ $(docker images -q --filter "dangling=true") != '' ]]; then
+        echo "Cleaning up any dangling images to give you some MB back..."
+        # Each build that doesn't use cache creates new caches and leaves the old ones taking up a lot of space.
+        # The following line will remove all of those "dangling" cache containers
+        docker rmi $(docker images -q --filter "dangling=true")
+      fi
+
+      echo
+    ;;
+
+    down)
+      docker compose down
+
+      : > ./logs/redis.log
+    ;;
+
+    up)
+      docker-compose up -d
+    ;;
+
+    restart)
+      docker-compose down
+      docker-compose up -d
+    ;;
+  esac
+fi
