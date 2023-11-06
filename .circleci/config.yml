@@ -14,6 +14,9 @@ jobs:
           command: yarn test
           name: Run tests
       - run:
+          command: yarn lint
+          name: Lint code
+      - run:
           command: yarn build
           name: Build app
       - persist_to_workspace:
